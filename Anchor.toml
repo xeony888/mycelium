@@ -11,7 +11,7 @@ mycelium = "BPif4ai1prLdd5oJXiMbG1s5Mhgu3g8yUYPURUdYBQ7C"
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "Localnet"
+cluster = "devnet"
 wallet = "/home/xeony/.config/solana/id.json"
 
 [scripts]

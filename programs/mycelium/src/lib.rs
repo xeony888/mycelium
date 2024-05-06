@@ -13,7 +13,7 @@ use mpl_token_metadata::pda::{find_master_edition_account, find_metadata_account
 declare_id!("BPif4ai1prLdd5oJXiMbG1s5Mhgu3g8yUYPURUdYBQ7C");
 
 #[program]
-pub mod solana_nft_anchor {
+pub mod mycelium {
     use super::*;
 
     pub fn init_nft(

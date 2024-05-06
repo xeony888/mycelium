@@ -2,7 +2,7 @@ import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
 import { Mycelium } from "../target/types/mycelium";
 import { walletAdapterIdentity } from "@metaplex-foundation/umi-signer-wallet-adapters";
-import { getAssociatedTokenAddress } from "@solana/spl-token";
+import { getAssociatedTokenAddress, getAssociatedTokenAddressSync } from "@solana/spl-token";
 import {
     findMasterEditionPda,
     findMetadataPda,
@@ -32,7 +32,7 @@ describe("mycelium", () => {
     const mint = anchor.web3.Keypair.generate();
 
     // Derive the associated token address account for the mint
-    const associatedTokenAccount = await getAssociatedTokenAddress(
+    const associatedTokenAccount = getAssociatedTokenAddressSync(
         mint.publicKey,
         signer.publicKey
     );
@@ -78,5 +78,4 @@ describe("mycelium", () => {
             `minted nft: https://explorer.solana.com/address/${mint.publicKey}?cluster=devnet`
         );
     });
-});
 });
