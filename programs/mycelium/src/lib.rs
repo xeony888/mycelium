@@ -1,122 +1,123 @@
 use anchor_lang::prelude::*;
-use anchor_spl::{associated_token::AssociatedToken, token::{transfer, Mint, Token, TokenAccount, Transfer}};
+use anchor_spl::{
+    associated_token::AssociatedToken,
+    metadata::{
+        create_master_edition_v3, create_metadata_accounts_v3, CreateMasterEditionV3,
+        CreateMetadataAccountsV3, Metadata,
+        mpl_token_metadata::types::DataV2
+    },
+    token::{mint_to, Mint, MintTo, Token, TokenAccount},
+};
+use mpl_token_metadata::pda::{find_master_edition_account, find_metadata_account};
 
 declare_id!("BPif4ai1prLdd5oJXiMbG1s5Mhgu3g8yUYPURUdYBQ7C");
 
 #[program]
-pub mod mycelium {
+pub mod solana_nft_anchor {
     use super::*;
 
-    pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
-        Ok(())
-    }
-    pub fn stake(ctx: Context<Stake>) -> Result<()> {
-        Ok(())
-    }
-    pub fn unstake(ctx: Context<Unstake>) -> Result<()> {
-        Ok(())
-    }
-    pub fn claim(ctx: Context<Claim>) -> Result<()> {
-        Ok(())
-    }
-    pub fn mint(ctx: Context<Mint>) -> Result<()> {
+    pub fn init_nft(
+        ctx: Context<InitNFT>,
+        name: String,
+        symbol: String,
+        uri: String,
+    ) -> Result<()> {
+
+        // create mint account
+        let cpi_context = CpiContext::new(
+            ctx.accounts.token_program.to_account_info(),
+            MintTo {
+                mint: ctx.accounts.mint.to_account_info(),
+                to: ctx.accounts.associated_token_account.to_account_info(),
+                authority: ctx.accounts.signer.to_account_info(),
+            },
+        );
+
+        mint_to(cpi_context, 1)?;
+
+        // create metadata account
+        let cpi_context = CpiContext::new(
+            ctx.accounts.token_metadata_program.to_account_info(),
+            CreateMetadataAccountsV3 {
+                metadata: ctx.accounts.metadata_account.to_account_info(),
+                mint: ctx.accounts.mint.to_account_info(),
+                mint_authority: ctx.accounts.signer.to_account_info(),
+                update_authority: ctx.accounts.signer.to_account_info(),
+                payer: ctx.accounts.signer.to_account_info(),
+                system_program: ctx.accounts.system_program.to_account_info(),
+                rent: ctx.accounts.rent.to_account_info(),
+            },
+        );
+
+        let data_v2 = DataV2 {
+            name: name,
+            symbol: symbol,
+            uri: uri,
+            seller_fee_basis_points: 0,
+            creators: None,
+            collection: None,
+            uses: None,
+        };
+
+        create_metadata_accounts_v3(cpi_context, data_v2, false, true, None)?;
+
+        //create master edition account
+        let cpi_context = CpiContext::new(
+            ctx.accounts.token_metadata_program.to_account_info(),
+            CreateMasterEditionV3 {
+                edition: ctx.accounts.master_edition_account.to_account_info(),
+                mint: ctx.accounts.mint.to_account_info(),
+                update_authority: ctx.accounts.signer.to_account_info(),
+                mint_authority: ctx.accounts.signer.to_account_info(),
+                payer: ctx.accounts.signer.to_account_info(),
+                metadata: ctx.accounts.metadata_account.to_account_info(),
+                token_program: ctx.accounts.token_program.to_account_info(),
+                system_program: ctx.accounts.system_program.to_account_info(),
+                rent: ctx.accounts.rent.to_account_info(),
+            },
+        );
+
+        create_master_edition_v3(cpi_context, None)?;
+
         Ok(())
     }
 }
 
 #[derive(Accounts)]
-pub struct Initialize<'info> {
-    #[account(
-        init,
-        payer = user,
-        seeds = [b"token"],
-        bump,
-        token::mint = mint,
-        token::authority = program_token_account
-    )]
-    pub program_token_account: Account<'info, TokenAccount>,
-    #[account(
-        init,
-        payer = user,
-        seeds = [b"auth"],
-        bump
-    )]
-    pub program_authority: UncheckedAccount<'info>,
-    pub mint: Account<'info, Mint>,
+pub struct InitNFT<'info> {
     #[account(mut)]
-    pub user: Signer<'info>,
-    pub system_program: Program<'info, System>,
-    pub token_program: Program<'info, Token>,
-}
-pub struct StakeInfo {
-    pub stake_times: Vec<u64>
-}
-#[derive(Accounts)]
-pub struct Stake<'info> {
+    pub signer: Signer<'info>,
+    #[account(
+        init,
+        payer = signer,
+        mint::decimals = 0,
+        mint::authority = signer.key(),
+        mint::freeze_authority = signer.key(),
+    )]
+    pub mint: Account<'info, Mint>,
     #[account(
         init_if_needed,
-        payer = user,
-        seeds = [b"stake", user.key().as_ref()],
-        bump
+        payer = signer,
+        associated_token::mint = mint,
+        associated_token::authority = signer,
     )]
-    pub stake_account: Account<'info, StakeInfo>,
-    #[account(
-        init,
-        payer = user,
-        seeds = [b"stake_token", user.key().as_ref(), mint.key().as_ref()],
-        bump,
-        token::mint = mint,
-        token::authority = program_authority,
-    )]
-    pub stake_token_account: Account<'info, TokenAccount>,
+    pub associated_token_account: Account<'info, TokenAccount>,
+    /// CHECK - address
     #[account(
         mut,
-        constraint = nft_account.owner == user.key(),
-        constraint = nft_account.amount == 1
+        address=find_metadata_account(&mint.key()).0,
     )]
-    pub nft_account: Account<'info, TokenAccount>,
-    pub mint: Account<'info, Mint>,
-    #[account(mut)]
-    pub user: Signer<'info>,
-    #[account(
-        seeds = [b"auth"],
-        bump
-    )]
-    pub program_authority: UncheckedAccount<'info>,
-    pub system_program: Program<'info, System>
-}
-#[derive(Accounts)]
-pub struct Unstake<'info> {
+    pub metadata_account: AccountInfo<'info>, 
+    /// CHECK: address
     #[account(
         mut,
-        seeds = [b"stake", user.key().as_ref()],
-        bump
+        address=find_master_edition_account(&mint.key()).0,
     )]
-    pub stake_account: Account<'info, StakeInfo>,
-    #[account(mut)]
-    pub user: Signer<'info>,
-    #[account(mut)]
-    pub user_token_account: Account<'info, TokenAccount>
-    pub system_program: Program<'info, System>
-}
-#[derive(Accounts)]
-pub struct Claim<'info> {
-    #[account(
-        seeds = [b"stake", user.key().as_ref()],
-        bump
-    )]
-    pub stake_account: Account<'info, StakeInfo>,
-    #[account(mut)]
-    pub user: Signer<'info>,
-    #[account(mut)]
-    pub user_token_account: Account<'info, TokenAccount>,
-    pub system_program: Program<'info, System>
-}
-#[derive(Accounts)]
-pub struct Mint<'info> {
-    #[account(mut)]
-    pub user: Signer<'info>,
-    #[account(mut)]
-    pub user_token_account: Account<'info, TokenAccount>,
+    pub master_edition_account: AccountInfo<'info>, 
 
+    pub token_program: Program<'info, Token>,
+    pub associated_token_program: Program<'info, AssociatedToken>,
+    pub token_metadata_program: Program<'info, Metadata>,
+    pub system_program: Program<'info, System>,
+    pub rent: Sysvar<'info, Rent>
 }
