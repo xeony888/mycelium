@@ -23,10 +23,10 @@ describe("mycelium", () => {
 
 
   const program = anchor.workspace.Mycelium as Program<Mycelium>;
-    const signer = provider.wallet;
+    const wallet = provider.wallet;
 
     const umi = createUmi("https://api.devnet.solana.com")
-        .use(walletAdapterIdentity(signer))
+        .use(walletAdapterIdentity(wallet))
         .use(mplTokenMetadata());
 
     const mint = anchor.web3.Keypair.generate();
@@ -34,9 +34,12 @@ describe("mycelium", () => {
     // Derive the associated token address account for the mint
     const associatedTokenAccount = getAssociatedTokenAddressSync(
         mint.publicKey,
-        signer.publicKey
+        wallet.publicKey
     );
-
+    const [programAuthority] = anchor.web3.PublicKey.findProgramAddressSync(
+      [Buffer.from("auth")],
+      program.programId,
+    )
     // derive the metadata account
     let metadataAccount = findMetadataPda(umi, {
         mint: publicKey(mint.publicKey),
@@ -47,21 +50,41 @@ describe("mycelium", () => {
         mint: publicKey(mint.publicKey),
     })[0];
 
-    const metadata = {
-        name: "Kobeni",
-        symbol: "kBN",
-        uri: "https://raw.githubusercontent.com/687c/solana-nft-native-client/main/metadata.json",
-    };
-
     it("mints nft!", async () => {
-        const tx = await program.methods
-            .initNft( metadata.name, metadata.symbol, metadata.uri )
+      const [collectionMint] = anchor.web3.PublicKey.findProgramAddressSync(
+        [Buffer.from("mint")],
+        program.programId,
+      );
+      const [collectionMetadataAccount] = findMetadataPda(umi, {mint: publicKey(mint.publicKey)})
+      const [collectionMasterEditionAccount] = findMasterEditionPda(umi, {mint: publicKey(mint.publicKey)});
+      const collectionAssociatedTokenAccount = getAssociatedTokenAddressSync(
+        collectionMint,
+        wallet.publicKey,
+      );
+      console.log("here");
+      const tx1 = await program.methods.initialize().accounts({
+        user: wallet.publicKey,
+        mint: collectionMint,
+        associatedTokenAccount: collectionAssociatedTokenAccount,
+        metadataAccount: collectionMetadataAccount,
+        masterEditionAccount: collectionMasterEditionAccount,
+        programAuthority,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+        tokenMetadataProgram: MPL_TOKEN_METADATA_PROGRAM_ID,
+        systemProgram: anchor.web3.SystemProgram.programId,
+        rent: anchor.web3.SYSVAR_RENT_PUBKEY,
+      }).rpc();
+        const tx2 = await program.methods
+            .mintNft()
             .accounts({
-                signer: provider.publicKey,
+                user: wallet.publicKey,
                 mint: mint.publicKey,
                 associatedTokenAccount,
                 metadataAccount,
                 masterEditionAccount,
+                programAuthority,
+                collection: collectionMint,
                 tokenProgram: TOKEN_PROGRAM_ID,
                 associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
                 tokenMetadataProgram: MPL_TOKEN_METADATA_PROGRAM_ID,
@@ -71,11 +94,10 @@ describe("mycelium", () => {
             .signers([mint])
             .rpc();
 
-        console.log(
-            `mint nft tx: https://explorer.solana.com/tx/${tx}?cluster=devnet`
-        );
-        console.log(
-            `minted nft: https://explorer.solana.com/address/${mint.publicKey}?cluster=devnet`
-        );
+        // console.log(
+        //     `mint nft tx: https://explorer.solana.com/tx/${tx1}?cluster=devnet`
+        // );
+        console.log(`minted nft: https://explorer.solana.com/address/${mint.publicKey}?cluster=devnet`);
+        console.log(`Minted collection nft: https://explorer.solana.com/address/${collectionMint}?cluster=devnet`)
     });
 });
