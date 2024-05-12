@@ -29,6 +29,20 @@ pub mod mycelium {
         ctx.accounts.stake_info.owner = ctx.accounts.user.key();
         Ok(())
     }
+    pub fn fund(ctx: Context<Fund>, amount: u64) -> Result<()> {
+        transfer(
+            CpiContext::new(
+                ctx.accounts.token_program.to_account_info(),
+                Transfer {
+                    from: ctx.accounts.user_token_account.to_account_info(),
+                    to: ctx.accounts.bank.to_account_info(),
+                    authority: ctx.accounts.user.to_account_info(),
+                }
+            ),
+            amount
+        );
+        Ok(())
+    }
     pub fn stake(ctx: Context<Stake>) -> Result<()> {
         // let nft_mint_account_pubkey = ctx.accounts.nft_mint.key();
         // let metadata_seed = &[
@@ -236,6 +250,7 @@ pub struct Initialize<'info> {
         bump,
         space = 8,
     )]
+    /// CHECK: 
     pub program_authority: AccountInfo<'info>,
     #[account(
         init,
@@ -265,6 +280,20 @@ pub struct InitializeUser<'info> {
     )]
     pub stake_info: Account<'info, StakeInfo>,
     pub system_program: Program<'info, System>,
+}
+#[derive(Accounts)]
+pub struct Fund<'info> {
+    #[account(mut)]
+    pub user: Signer<'info>,
+    #[account(
+        mut
+        seeds = [b"bank"],
+        bump,
+    )]
+    pub bank: Account<'info, TokenAccount>,
+    #[account(mut)]
+    pub user_token_account: Account<'info, TokenAccount>,
+    pub token_program: Program<'info, Token>,
 }
 #[account]
 pub struct StakeInfo {
@@ -316,15 +345,18 @@ pub struct Stake<'info> {
         mut,
         address=find_metadata_account(&nft_mint.key()).0,
     )]
+    /// CHECK: 
     pub nft_metadata_account: AccountInfo<'info>,
     #[account(
         seeds = [b"auth"],
         bump,
     )]
+    /// CHECK: 
     pub program_authority: AccountInfo<'info>,
     pub system_program: Program<'info, System>,
     pub token_program: Program<'info, Token>,
     #[account(address = mpl_token_metadata::ID)]
+    /// CHECK: 
     pub token_metadata_program: AccountInfo<'info>,
 }
 #[derive(Accounts)]
@@ -345,13 +377,14 @@ pub struct Unstake<'info> {
     )]
     pub stake_account: Account<'info, TokenAccount>,
     #[account(
-        constraint = nft_account.amount == 0
+        constraint = nft_account.amount == 0,
     )]
     pub nft_account: Account<'info, TokenAccount>,
     #[account(
         seeds = [b"auth"],
         bump,
     )]
+    /// CHECK: 
     pub program_authority: AccountInfo<'info>,
     #[account(
         mut,
@@ -360,19 +393,6 @@ pub struct Unstake<'info> {
     )]
     pub bank: Account<'info, TokenAccount>,
     #[account(mut)]
-    pub user_token_account: Account<'info, TokenAccount>,
-    pub token_program: Program<'info, Token>,
-}
-#[derive(Accounts)]
-pub struct Fund<'info> {
-    #[account(mut)]
-    pub user: Signer<'info>,
-    #[account(
-        mut,
-        seeds = [b"bank"],
-        bump,
-    )]
-    pub bank: Account<'info, TokenAccount>,
     pub user_token_account: Account<'info, TokenAccount>,
     pub token_program: Program<'info, Token>,
 }
@@ -396,6 +416,7 @@ pub struct Claim<'info> {
         seeds = [b"auth"],
         bump,
     )]
+    /// CHECK: 
     pub program_authority: AccountInfo<'info>,
     pub user_token_account: Account<'info, TokenAccount>,
     pub token_program: Program<'info, Token>,
@@ -440,6 +461,7 @@ pub struct MintNFT<'info> {
     pub token_program: Program<'info, Token>,
     pub associated_token_program: Program<'info, AssociatedToken>,
     #[account(address = mpl_token_metadata::ID)]
+    /// CHECK: 
     pub token_metadata_program: AccountInfo<'info>,
     pub system_program: Program<'info, System>,
     pub rent: Sysvar<'info, Rent>
