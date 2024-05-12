@@ -6,7 +6,7 @@ use anchor_spl::{
         CreateMetadataAccountsV3,
         mpl_token_metadata::types::DataV2
     },
-    token::{mint_to, Mint, MintTo, Token, TokenAccount, transfer},
+    token::{mint_to, Mint, MintTo, Token, TokenAccount, transfer, Transfer},
 };
 use anchor_spl::metadata::mpl_token_metadata::types::Creator;
 use anchor_spl::metadata::mpl_token_metadata::accounts::Metadata;
@@ -16,13 +16,8 @@ declare_id!("5436YrJ1qj5U1t8LLXiby2T9niesEsEMz1yimMAA3Mp7");
 const CREATOR: &str = "58V6myLoy5EVJA3U2wPdRDMUXpkwg8Vfw5b6fHqi2mEj";
 #[program]
 pub mod mycelium {
-
-    use core::time;
-
-    use anchor_spl::{token::Transfer, token_2022::spl_token_2022::solana_zk_token_sdk::instruction::transfer};
-
     use super::*;
-    pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
+    pub fn initialize(_ctx: Context<Initialize>) -> Result<()> {
         Ok(())
     }
     pub fn initialize_user(ctx: Context<InitializeUser>) -> Result<()> {
@@ -40,7 +35,7 @@ pub mod mycelium {
                 }
             ),
             amount
-        );
+        )?;
         Ok(())
     }
     pub fn stake(ctx: Context<Stake>) -> Result<()> {
@@ -286,7 +281,7 @@ pub struct Fund<'info> {
     #[account(mut)]
     pub user: Signer<'info>,
     #[account(
-        mut
+        mut,
         seeds = [b"bank"],
         bump,
     )]
