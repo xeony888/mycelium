@@ -100,7 +100,7 @@ describe("mycelium", () => {
     };
     // derive the metadata account
     it("initializes", async () => {
-      //await setupToken();
+      await setupToken();
       await program.methods.initialize().accounts({
         programAuthority,
         bank,
