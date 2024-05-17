@@ -4,7 +4,9 @@ use anchor_spl::{
     metadata::{
         create_master_edition_v3, create_metadata_accounts_v3, CreateMasterEditionV3,
         CreateMetadataAccountsV3,
-        mpl_token_metadata::types::DataV2
+        mpl_token_metadata::types::DataV2,
+        sign_metadata,
+        SignMetadata,
     },
     token::{mint_to, Mint, MintTo, Token, TokenAccount, transfer, Transfer},
 };
@@ -12,7 +14,7 @@ use anchor_spl::metadata::mpl_token_metadata::types::Creator;
 use anchor_spl::metadata::mpl_token_metadata::accounts::Metadata;
 use mpl_token_metadata::pda::{find_master_edition_account, find_metadata_account};
 
-declare_id!("5436YrJ1qj5U1t8LLXiby2T9niesEsEMz1yimMAA3Mp7");
+declare_id!("8ksKMLBAj671aXERRTx7oxHVvn3nDhU2RMZ2UD4eaVDV");
 const CREATOR: &str = "58V6myLoy5EVJA3U2wPdRDMUXpkwg8Vfw5b6fHqi2mEj";
 #[program]
 pub mod mycelium {
@@ -159,42 +161,30 @@ pub mod mycelium {
         Ok(())
     }
     pub fn mint_nft(ctx: Context<MintNFT>) -> Result<()> {
+
         // create mint account
-        let cpi_context = CpiContext::new(
+
+        mint_to(CpiContext::new_with_signer(
             ctx.accounts.token_program.to_account_info(),
             MintTo {
                 mint: ctx.accounts.mint.to_account_info(),
                 to: ctx.accounts.associated_token_account.to_account_info(),
                 authority: ctx.accounts.program_authority.to_account_info(),
             },
-        );
-
-        mint_to(cpi_context, 1)?;
-
+            &[&[b"auth", &[ctx.bumps.program_authority]]]
+        ), 1)?;
         // create metadata account
-        let cpi_context = CpiContext::new(
-            ctx.accounts.token_metadata_program.to_account_info(),
-            CreateMetadataAccountsV3 {
-                metadata: ctx.accounts.metadata_account.to_account_info(),
-                mint: ctx.accounts.mint.to_account_info(),
-                mint_authority: ctx.accounts.program_authority.to_account_info(),
-                update_authority: ctx.accounts.program_authority.to_account_info(),
-                payer: ctx.accounts.user.to_account_info(),
-                system_program: ctx.accounts.system_program.to_account_info(),
-                rent: ctx.accounts.rent.to_account_info(),
-            },
-        );
 
         let data_v2 = DataV2 {
             name: String::from("Spore"),
             symbol: String::from("SPORE"),
-            uri: String::from("YOLO"),
-            seller_fee_basis_points: 100,
+            uri: String::from("https://www.example.com"),
+            seller_fee_basis_points: 0,
             creators: Some(vec![
                 Creator {
                     address: ctx.accounts.program_authority.key(),
                     verified: true,
-                    share: 0
+                    share: 0,
                 },
                 Creator {
                     address: CREATOR.parse::<Pubkey>().unwrap(),
@@ -206,25 +196,36 @@ pub mod mycelium {
             uses: None,
         };
 
-        create_metadata_accounts_v3(cpi_context, data_v2, false, true, None)?;
+        create_metadata_accounts_v3(CpiContext::new_with_signer(
+            ctx.accounts.token_metadata_program.to_account_info(),
+            CreateMetadataAccountsV3 {
+                metadata: ctx.accounts.metadata_account.to_account_info(),
+                mint: ctx.accounts.mint.to_account_info(),
+                mint_authority: ctx.accounts.program_authority.to_account_info(),
+                update_authority: ctx.accounts.program_authority.to_account_info(),
+                payer: ctx.accounts.signer.to_account_info(),
+                system_program: ctx.accounts.system_program.to_account_info(),
+                rent: ctx.accounts.rent.to_account_info(),
+            },
+            &[&[b"auth", &[ctx.bumps.program_authority]]]
+        ), data_v2, false, true, None)?;
 
         //create master edition account
-        let cpi_context = CpiContext::new(
+        create_master_edition_v3(CpiContext::new_with_signer(
             ctx.accounts.token_metadata_program.to_account_info(),
             CreateMasterEditionV3 {
                 edition: ctx.accounts.master_edition_account.to_account_info(),
                 mint: ctx.accounts.mint.to_account_info(),
                 update_authority: ctx.accounts.program_authority.to_account_info(),
                 mint_authority: ctx.accounts.program_authority.to_account_info(),
-                payer: ctx.accounts.user.to_account_info(),
+                payer: ctx.accounts.signer.to_account_info(),
                 metadata: ctx.accounts.metadata_account.to_account_info(),
                 token_program: ctx.accounts.token_program.to_account_info(),
                 system_program: ctx.accounts.system_program.to_account_info(),
                 rent: ctx.accounts.rent.to_account_info(),
             },
-        );
-
-        create_master_edition_v3(cpi_context, None)?;
+            &[&[b"auth", &[ctx.bumps.program_authority]]]
+        ), None)?;
 
         Ok(())
     }
@@ -419,16 +420,16 @@ pub struct Claim<'info> {
 #[derive(Accounts)]
 pub struct MintNFT<'info> {
     #[account(mut)]
-    pub user: Signer<'info>,
+    pub signer: Signer<'info>,
     #[account(
         seeds = [b"auth"],
         bump,
     )]
-    /// CHECK: auth
+    /// CHECK: 
     pub program_authority: AccountInfo<'info>,
     #[account(
         init,
-        payer = user,
+        payer = signer,
         mint::decimals = 0,
         mint::authority = program_authority.key(),
         mint::freeze_authority = program_authority.key(),
@@ -436,9 +437,9 @@ pub struct MintNFT<'info> {
     pub mint: Account<'info, Mint>,
     #[account(
         init_if_needed,
-        payer = user,
+        payer = signer,
         associated_token::mint = mint,
-        associated_token::authority = user,
+        associated_token::authority = signer,
     )]
     pub associated_token_account: Account<'info, TokenAccount>,
     /// CHECK - address
@@ -453,9 +454,9 @@ pub struct MintNFT<'info> {
         address=find_master_edition_account(&mint.key()).0,
     )]
     pub master_edition_account: AccountInfo<'info>, 
+
     pub token_program: Program<'info, Token>,
     pub associated_token_program: Program<'info, AssociatedToken>,
-    #[account(address = mpl_token_metadata::ID)]
     /// CHECK: 
     pub token_metadata_program: AccountInfo<'info>,
     pub system_program: Program<'info, System>,
