@@ -14,7 +14,7 @@ use anchor_spl::metadata::mpl_token_metadata::types::Creator;
 use anchor_spl::metadata::mpl_token_metadata::accounts::Metadata;
 use mpl_token_metadata::pda::{find_master_edition_account, find_metadata_account};
 
-declare_id!("8ksKMLBAj671aXERRTx7oxHVvn3nDhU2RMZ2UD4eaVDV");
+declare_id!("DWnK5EzB9qHAndpqa2HP4DJQxdiTpwkc1bG2TtSDnb1j");
 const CREATOR: &str = "58V6myLoy5EVJA3U2wPdRDMUXpkwg8Vfw5b6fHqi2mEj";
 #[program]
 pub mod mycelium {
@@ -41,16 +41,6 @@ pub mod mycelium {
         Ok(())
     }
     pub fn stake(ctx: Context<Stake>) -> Result<()> {
-        // let nft_mint_account_pubkey = ctx.accounts.nft_mint.key();
-        // let metadata_seed = &[
-        //     "metadata".as_bytes(),
-        //     ctx.accounts.token_metadata_program.key.as_ref(),
-        //     nft_mint_account_pubkey.as_ref(),
-        // ];
-        // let (metadata_derived_key, _bump) = Pubkey::find_program_address(metadata_seed, ctx.accounts.token_metadata_program.key);
-        // if  metadata_derived_key != ctx.accounts.nft_metadata_account.key() || ctx.accounts.nft_metadata_account.data_is_empty() {
-        //     return Err(CustomError::IncorrectCollection.into());
-        // }
         let metadata_full_account =  match Metadata::try_from(&ctx.accounts.nft_metadata_account).ok() {
             None => return Err(CustomError::InvalidAccount.into()),
             Some(account) => account
@@ -100,7 +90,7 @@ pub mod mycelium {
             )?;
         }
         stake_info.realloc(new_size, false)?;
-        ctx.accounts.stake_info.add_stake(ctx.accounts.nft_account.mint, time);
+        ctx.accounts.stake_info.add_stake(ctx.accounts.nft_account.mint.key(), time);
         Ok(())
     }
     pub fn unstake(ctx: Context<Unstake>) -> Result<()> {
@@ -130,7 +120,7 @@ pub mod mycelium {
                     to: ctx.accounts.user_token_account.to_account_info(),
                     authority: ctx.accounts.bank.to_account_info(),
                 },
-                &[&[b"bank", &[ctx.bumps.bank]]]
+                &[&[b"auth", &[ctx.bumps.program_authority]]]
             ),
             amount,
         )?;
@@ -146,18 +136,20 @@ pub mod mycelium {
             total += (date - ctx.accounts.stake_info.staked_times[i]) as u64;
             ctx.accounts.stake_info.staked_times[i] = date;
         }
-        transfer(
-            CpiContext::new_with_signer(
-                ctx.accounts.token_program.to_account_info(),
-                Transfer {
-                    from: ctx.accounts.bank.to_account_info(),
-                    to: ctx.accounts.user_token_account.to_account_info(),
-                    authority: ctx.accounts.bank.to_account_info(),
-                },
-                &[&[b"bank", &[ctx.bumps.bank]]]
-            ),
-            total
-        )?;
+        if total > 0 {
+            transfer(
+                CpiContext::new_with_signer(
+                    ctx.accounts.token_program.to_account_info(),
+                    Transfer {
+                        from: ctx.accounts.bank.to_account_info(),
+                        to: ctx.accounts.user_token_account.to_account_info(),
+                        authority: ctx.accounts.bank.to_account_info(),
+                    },
+                    &[&[b"auth", &[ctx.bumps.program_authority]]]
+                ),
+                total
+            )?;
+        }
         Ok(())
     }
     pub fn mint_nft(ctx: Context<MintNFT>) -> Result<()> {

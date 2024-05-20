@@ -5,7 +5,7 @@ seeds = false
 skip-lint = false
 
 [programs.localnet]
-mycelium = "8ksKMLBAj671aXERRTx7oxHVvn3nDhU2RMZ2UD4eaVDV"
+mycelium = "DWnK5EzB9qHAndpqa2HP4DJQxdiTpwkc1bG2TtSDnb1j"
 
 [registry]
 url = "https://api.apr.dev"

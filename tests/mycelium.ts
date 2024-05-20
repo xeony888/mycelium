@@ -37,7 +37,7 @@ describe("mycelium", () => {
       [Buffer.from("bank")],
       program.programId,
     )
-    let mint: PublicKey = new PublicKey("CJRX7iLNa3SUUpnmysn2NQ1okgcPnhtd9tE826sUyCvM");
+    let mint: PublicKey = new PublicKey("9BoLHoDmuqENZpxJfh1yggpNvR5N4Vu9MivENVLvNXRy");
     const mintNft = async () => {
       const mint = anchor.web3.Keypair.generate();
 
@@ -100,7 +100,7 @@ describe("mycelium", () => {
     };
     // derive the metadata account
     it("initializes", async () => {
-      await setupToken();
+      //await setupToken();
       await program.methods.initialize().accounts({
         programAuthority,
         bank,
@@ -184,6 +184,9 @@ describe("mycelium", () => {
         [Buffer.from("stake_account"), wallet.publicKey.toBuffer(), nftAccount.toBuffer()],
         program.programId
       )
+      console.log(stakeInfo);
+      const account = await program.account.stakeInfo.fetch(stakeInfo);
+      console.log(account);
       await program.methods.stake().accounts({
         user: wallet.publicKey,
         stakeInfo,
@@ -194,6 +197,7 @@ describe("mycelium", () => {
         programAuthority,
         tokenMetadataProgram: MPL_TOKEN_METADATA_PROGRAM_ID,
       }).signers([wallet.payer]).rpc();
+
       const userTokenAccount = getAssociatedTokenAddressSync(mint, wallet.publicKey);
       const before = await getAccount(provider.connection, userTokenAccount);
       await program.methods.claim().accounts({
