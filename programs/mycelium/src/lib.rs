@@ -301,7 +301,7 @@ pub struct StakeInfo {
 }
 impl StakeInfo {
     pub fn space(size: usize) -> usize {
-        32 + 4 + 32 * size + 4 + 8 * size
+        8 + 32 + 4 + 32 * size + 4 + 8 * size
     }
     pub fn add_stake(&mut self, mint: Pubkey, time: i64) {
         self.mints.push(mint);
