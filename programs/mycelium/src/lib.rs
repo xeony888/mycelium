@@ -161,18 +161,19 @@ pub mod mycelium {
         Ok(())
     }
     pub fn mint_nft(ctx: Context<MintNFT>) -> Result<()> {
-
-        // create mint account
-
-        mint_to(CpiContext::new_with_signer(
-            ctx.accounts.token_program.to_account_info(),
-            MintTo {
-                mint: ctx.accounts.mint.to_account_info(),
-                to: ctx.accounts.associated_token_account.to_account_info(),
-                authority: ctx.accounts.program_authority.to_account_info(),
-            },
-            &[&[b"auth", &[ctx.bumps.program_authority]]]
-        ), 1)?;
+        mint_to(
+            CpiContext::new_with_signer(
+                ctx.accounts.token_program.to_account_info(),
+                MintTo {
+                    mint: ctx.accounts.mint.to_account_info(),
+                    to: ctx.accounts.associated_token_account.to_account_info(),
+                    authority: ctx.accounts.program_authority.to_account_info(),
+                },
+                &[&[b"auth", &[ctx.bumps.program_authority]]]
+            ), 
+            1
+        )?;
+        msg!("Minted");
         // create metadata account
 
         let data_v2 = DataV2 {
@@ -196,37 +197,46 @@ pub mod mycelium {
             uses: None,
         };
 
-        create_metadata_accounts_v3(CpiContext::new_with_signer(
-            ctx.accounts.token_metadata_program.to_account_info(),
-            CreateMetadataAccountsV3 {
-                metadata: ctx.accounts.metadata_account.to_account_info(),
-                mint: ctx.accounts.mint.to_account_info(),
-                mint_authority: ctx.accounts.program_authority.to_account_info(),
-                update_authority: ctx.accounts.program_authority.to_account_info(),
-                payer: ctx.accounts.signer.to_account_info(),
-                system_program: ctx.accounts.system_program.to_account_info(),
-                rent: ctx.accounts.rent.to_account_info(),
-            },
-            &[&[b"auth", &[ctx.bumps.program_authority]]]
-        ), data_v2, false, true, None)?;
-
+        create_metadata_accounts_v3(
+            CpiContext::new_with_signer(
+                ctx.accounts.token_metadata_program.to_account_info(),
+                CreateMetadataAccountsV3 {
+                    metadata: ctx.accounts.metadata_account.to_account_info(),
+                    mint: ctx.accounts.mint.to_account_info(),
+                    mint_authority: ctx.accounts.program_authority.to_account_info(),
+                    update_authority: ctx.accounts.program_authority.to_account_info(),
+                    payer: ctx.accounts.signer.to_account_info(),
+                    system_program: ctx.accounts.system_program.to_account_info(),
+                    rent: ctx.accounts.rent.to_account_info(),
+                },
+                &[&[b"auth", &[ctx.bumps.program_authority]]]
+            ), 
+            data_v2, 
+            false, 
+            true, 
+            None
+        )?;
+        msg!("metadata created");
         //create master edition account
-        create_master_edition_v3(CpiContext::new_with_signer(
-            ctx.accounts.token_metadata_program.to_account_info(),
-            CreateMasterEditionV3 {
-                edition: ctx.accounts.master_edition_account.to_account_info(),
-                mint: ctx.accounts.mint.to_account_info(),
-                update_authority: ctx.accounts.program_authority.to_account_info(),
-                mint_authority: ctx.accounts.program_authority.to_account_info(),
-                payer: ctx.accounts.signer.to_account_info(),
-                metadata: ctx.accounts.metadata_account.to_account_info(),
-                token_program: ctx.accounts.token_program.to_account_info(),
-                system_program: ctx.accounts.system_program.to_account_info(),
-                rent: ctx.accounts.rent.to_account_info(),
-            },
-            &[&[b"auth", &[ctx.bumps.program_authority]]]
-        ), None)?;
-
+        create_master_edition_v3(
+            CpiContext::new_with_signer(
+                ctx.accounts.token_metadata_program.to_account_info(),
+                CreateMasterEditionV3 {
+                    edition: ctx.accounts.master_edition_account.to_account_info(),
+                    mint: ctx.accounts.mint.to_account_info(),
+                    update_authority: ctx.accounts.program_authority.to_account_info(),
+                    mint_authority: ctx.accounts.program_authority.to_account_info(),
+                    payer: ctx.accounts.signer.to_account_info(),
+                    metadata: ctx.accounts.metadata_account.to_account_info(),
+                    token_program: ctx.accounts.token_program.to_account_info(),
+                    system_program: ctx.accounts.system_program.to_account_info(),
+                    rent: ctx.accounts.rent.to_account_info(),
+                },
+                &[&[b"auth", &[ctx.bumps.program_authority]]]
+            ), 
+            Some(1)
+        )?;
+        msg!("done");
         Ok(())
     }
 }
