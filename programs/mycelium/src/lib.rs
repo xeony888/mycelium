@@ -12,7 +12,7 @@ use anchor_spl::metadata::mpl_token_metadata::types::Creator;
 use anchor_spl::metadata::mpl_token_metadata::accounts::Metadata;
 use mpl_token_metadata::pda::{find_master_edition_account, find_metadata_account};
 
-declare_id!("4eDUJxPfBLtpJcxQgA5Wxmbg6GSVE3Lax676rAXbuoPm");
+declare_id!("9VpuWDGg76xF5QsEiVmsRyewg5fYCprXbDLwfNES91AK");
 const CREATOR: &str = "58V6myLoy5EVJA3U2wPdRDMUXpkwg8Vfw5b6fHqi2mEj";
 const SUPPLY: u64 = 6000;
 const REWARD: u64 = 1000;
