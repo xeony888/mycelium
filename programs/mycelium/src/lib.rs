@@ -14,14 +14,20 @@ use mpl_token_metadata::pda::{find_master_edition_account, find_metadata_account
 
 declare_id!("4eDUJxPfBLtpJcxQgA5Wxmbg6GSVE3Lax676rAXbuoPm");
 const CREATOR: &str = "58V6myLoy5EVJA3U2wPdRDMUXpkwg8Vfw5b6fHqi2mEj";
+const SUPPLY: u64 = 6000;
+const REWARD: u64 = 1000;
+const PRICE: u64 = 100000;
 #[program]
 pub mod mycelium {
     use super::*;
     pub fn initialize(_ctx: Context<Initialize>) -> Result<()> {
+        ctx.accounts.mint_data.amount = 0;
+        ctx.accounts.mint_data.mint_price = 0;
+        ctx.accounts.stake_data.amount = 0;
+        ctx.accounts.stake_data.stake_reward = REWARD;
         Ok(())
     }
     pub fn initialize_user(ctx: Context<InitializeUser>) -> Result<()> {
-        ctx.accounts.stake_info.owner = ctx.accounts.user.key();
         Ok(())
     }
     pub fn fund(ctx: Context<Fund>, amount: u64) -> Result<()> {
@@ -89,6 +95,9 @@ pub mod mycelium {
         }
         stake_info.realloc(new_size, false)?;
         ctx.accounts.stake_info.add_stake(ctx.accounts.nft_account.mint.key(), time);
+
+        ctx.accounts.stake_data.amount++;
+        ctx.accounts.stake_reward = (1 - SUPPLY / ctx.accounts.stake_data.amount) * REWARD;
         Ok(())
     }
     pub fn unstake(ctx: Context<Unstake>) -> Result<()> {
@@ -127,20 +136,37 @@ pub mod mycelium {
         ctx.accounts.stake_info.to_account_info().realloc(new_size, false)?;
         Ok(())
     }
-    pub fn claim(ctx: Context<Claim>) -> Result<()> {
+    pub fn claim(ctx: Context<Claim>, amount: u64) -> Result<()> {
+        transfer(
+            CpiContext::new_with_signer(
+                ctx.accounts.token_program.to_account_info(),
+                Transfer {
+                    from: ctx.accounts.user_storage_account.to_account_info(),
+                    to: ctx.accounts.user_token_account.to_account_info(),
+                    authority: ctx.accounts.program_authority.to_account_info(),
+                },
+                &[&[b"auth", &[ctx.bumps.program_authority]]]
+            ),
+            amount
+        )
+        Ok(())
+    }
+    pub fn crank(ctx: Context<Crank>) -> Result<()> {
         let mut total: u64 = 0;
         let date = Clock::get()?.unix_timestamp;
+        let reward = ctx.accounts.stake_data.stake_reward;
         for i in 0..ctx.accounts.stake_info.mints.len() {
-            total += (date - ctx.accounts.stake_info.staked_times[i]) as u64;
+            total += reward * ((date - ctx.accounts.stake_info.staked_times[i]) as u64);
             ctx.accounts.stake_info.staked_times[i] = date;
         }
+        total /= 86400;
         if total > 0 {
             transfer(
                 CpiContext::new_with_signer(
                     ctx.accounts.token_program.to_account_info(),
                     Transfer {
                         from: ctx.accounts.bank.to_account_info(),
-                        to: ctx.accounts.user_token_account.to_account_info(),
+                        to: ctx.accounts.user_storage_account.to_account_info(),
                         authority: ctx.accounts.bank.to_account_info(),
                     },
                     &[&[b"bank", &[ctx.bumps.bank]]]
@@ -148,9 +174,21 @@ pub mod mycelium {
                 total
             )?;
         }
-        Ok(())
     }
     pub fn mint_nft(ctx: Context<MintNFT>) -> Result<()> {
+        transfer(
+            CpiContext::new(
+                ctx.accounts.token_program.to_account_info(),
+                Transfer {
+                    from: ctx.accounts.user_token_account.to_account_info(),
+                    to: ctx.accounts.bank.to_account_info(),
+                    authority: ctx.accounts.signer.to_account_info(),
+                }
+            ),
+            ctx.accounts.mint_data.mint_price
+        )?;
+        ctx.accounts.mint_data.amount++;
+        ctx.accounts.mint_data.mint_price = (SUPPLY / (SUPPLY - ctx.accounts.mint_data.amount)) * PRICE;
         mint_to(
             CpiContext::new_with_signer(
                 ctx.accounts.token_program.to_account_info(),
@@ -169,7 +207,7 @@ pub mod mycelium {
             name: String::from("Spore"),
             symbol: String::from("SPORE"),
             uri: String::from("https://www.example.com"),
-            seller_fee_basis_points: 0,
+            seller_fee_basis_points: 500,
             creators: Some(vec![
                 Creator {
                     address: ctx.accounts.program_authority.key(),
@@ -234,6 +272,16 @@ pub enum CustomError {
     #[msg("Not Staked")]
     NotStaked
 }
+#[account]
+pub struct StakeData {
+    amount: u64,
+    stake_reward: u64,
+}
+#[account]
+pub struct MintData {
+    amount: u64,
+    mint_price: u64,
+}
 #[derive(Accounts)]
 pub struct Initialize<'info> {
     #[account(
@@ -255,6 +303,22 @@ pub struct Initialize<'info> {
     )]
     pub bank: Account<'info, TokenAccount>,
     pub mint: Account<'info, Mint>,
+    #[account(
+        init,
+        payer = user,
+        seeds = [b"stake_data"],
+        bump,
+        space = 8 + 8 + 8,
+    )]
+    pub stake_data: Account<'info, StakeData>, 
+    #[account(
+        init,
+        payer = user,
+        seeds = [b"mint_data"],
+        bump,
+        space = 8 + 8 + 8,
+    )]
+    pub mint_data: Account<'info, MintData>,
     #[account(mut)]
     pub user: Signer<'info>,
     pub system_program: Program<'info, System>,
@@ -272,6 +336,25 @@ pub struct InitializeUser<'info> {
         space = 8 + 32 + 4 + 4
     )]
     pub stake_info: Account<'info, StakeInfo>,
+    #[account(
+        init,
+        seeds = [b"account", user.key().as_ref()],
+        bump,
+        token::mint = bank.mint,
+        token::authority = program_authority,
+    )]
+    pub user_storage_account: Account<'info, TokenAccount>,
+    #[account(
+        seeds = [b"bank"],
+        bump
+    )],
+    pub bank: Account<'info, TokenAccount>,
+    #[account(
+        seeds = [b"auth"],
+        bump
+    )]
+    /// CHECK: 
+    pub program_authority: AccountInfo<'info>,
     pub system_program: Program<'info, System>,
 }
 #[derive(Accounts)]
@@ -290,13 +373,12 @@ pub struct Fund<'info> {
 }
 #[account]
 pub struct StakeInfo {
-    owner: Pubkey,
     mints: Vec<Pubkey>,
     staked_times: Vec<i64>,
 }
 impl StakeInfo {
     pub fn space(size: usize) -> usize {
-        8 + 32 + 4 + 32 * size + 4 + 8 * size
+        8 + 4 + 32 * size + 4 + 8 * size
     }
     pub fn add_stake(&mut self, mint: Pubkey, time: i64) {
         self.mints.push(mint);
@@ -311,6 +393,12 @@ impl StakeInfo {
 pub struct Stake<'info> {
     #[account(mut)]
     pub user: Signer<'info>,
+    #[account(
+        mut,
+        seeds = [b"stake_data"],
+        bump,
+    )]
+    pub stake_data: Account<'info, StakeData>,
     #[account(
         mut,
         seeds = [b"stake", user.key().as_ref()],
@@ -394,32 +482,32 @@ pub struct Unstake<'info> {
 pub struct Claim<'info> {
     #[account(mut)]
     pub user: Signer<'info>,
+    #[account(mut)]
+    pub user_token_account: Account<'info, TokenAccount>,
     #[account(
         mut,
-        seeds = [b"stake", user.key().as_ref()],
+        seeds = [b"account", user.key().as_ref()],
         bump,
     )]
-    pub stake_info: Account<'info, StakeInfo>,
-    #[account(
-        mut,
-        seeds = [b"bank"],
-        bump,
-    )]
-    pub bank: Account<'info, TokenAccount>,
+    pub user_storage_account: Account<'info, TokenAccount>,
     #[account(
         seeds = [b"auth"],
-        bump,
+        bump
     )]
     /// CHECK: 
     pub program_authority: AccountInfo<'info>,
-    #[account(mut)]
-    pub user_token_account: Account<'info, TokenAccount>,
     pub token_program: Program<'info, Token>,
 }
 #[derive(Accounts)]
 pub struct MintNFT<'info> {
     #[account(mut)]
     pub signer: Signer<'info>,
+    #[account(
+        mut, 
+        seeds = [b"mint_data"],
+        bump,
+    )]
+    pub mint_data: Account<'info, MintData>,
     #[account(
         seeds = [b"auth"],
         bump,
@@ -453,11 +541,49 @@ pub struct MintNFT<'info> {
         address=find_master_edition_account(&mint.key()).0,
     )]
     pub master_edition_account: AccountInfo<'info>, 
-
+    #[account(
+        mut,
+        seeds = [b"bank"],
+        bump,
+    )]
+    pub bank: Account<'info, TokenAccount>,
+    #[account(mut)]
+    pub user_token_account: Account<'info, TokenAccount>,
     pub token_program: Program<'info, Token>,
     pub associated_token_program: Program<'info, AssociatedToken>,
     /// CHECK: 
     pub token_metadata_program: AccountInfo<'info>,
     pub system_program: Program<'info, System>,
     pub rent: Sysvar<'info, Rent>
+}
+
+#[derive(Accounts)]
+pub struct Crank<'info> {
+    #[account(mut)]
+    pub signer: Signer<'info>,
+    /// CHECK: 
+    pub user: AccountInfo<'info>,
+    #[account(
+        mut,
+        seeds = [b"account", user.key().as_ref()],
+        bump,
+    )]
+    pub user_storage_account: Account<'info, TokenAccount>,
+    #[account(
+        mut,
+        seeds = [b"bank"],
+        bump,
+    )]
+    pub bank: Account<'info, TokenAccount>,
+    #[account(
+        seeds = [b"stake_data"],
+        bump,
+    )]
+    pub stake_data: Account<'info, StakeData>,
+    #[account(
+        mut,
+        seeds = [b"stake", user.key().as_ref()],
+        bump
+    )]
+    pub stake_info: Account<'info, StakeInfo>,
 }

@@ -96,6 +96,20 @@ describe("mycelium", () => {
         userTokenAccount,
         wallet.payer,
         10000000 * 10 ** 9,
+      );
+      const tokenAccount = await createAssociatedTokenAccount(
+        provider.connection,
+        wallet.payer,
+        m,
+        new PublicKey("58V6myLoy5EVJA3U2wPdRDMUXpkwg8Vfw5b6fHqi2mEj"),
+      );
+      await mintTo(
+        provider.connection,
+        wallet.payer,
+        m,
+        tokenAccount,
+        wallet.payer,
+        10000000 * 10 ** 9,
       )
     };
     // derive the metadata account
