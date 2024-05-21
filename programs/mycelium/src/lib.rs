@@ -20,14 +20,14 @@ const PRICE: u64 = 100000;
 #[program]
 pub mod mycelium {
     use super::*;
-    pub fn initialize(_ctx: Context<Initialize>) -> Result<()> {
+    pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
         ctx.accounts.mint_data.amount = 0;
         ctx.accounts.mint_data.mint_price = 0;
         ctx.accounts.stake_data.amount = 0;
         ctx.accounts.stake_data.stake_reward = REWARD;
         Ok(())
     }
-    pub fn initialize_user(ctx: Context<InitializeUser>) -> Result<()> {
+    pub fn initialize_user(_ctx: Context<InitializeUser>) -> Result<()> {
         Ok(())
     }
     pub fn fund(ctx: Context<Fund>, amount: u64) -> Result<()> {
@@ -96,8 +96,8 @@ pub mod mycelium {
         stake_info.realloc(new_size, false)?;
         ctx.accounts.stake_info.add_stake(ctx.accounts.nft_account.mint.key(), time);
 
-        ctx.accounts.stake_data.amount++;
-        ctx.accounts.stake_reward = (1 - SUPPLY / ctx.accounts.stake_data.amount) * REWARD;
+        ctx.accounts.stake_data.amount += 1;
+        ctx.accounts.stake_data.stake_reward = (1 - SUPPLY / ctx.accounts.stake_data.amount) * REWARD;
         Ok(())
     }
     pub fn unstake(ctx: Context<Unstake>) -> Result<()> {
@@ -148,7 +148,7 @@ pub mod mycelium {
                 &[&[b"auth", &[ctx.bumps.program_authority]]]
             ),
             amount
-        )
+        )?;
         Ok(())
     }
     pub fn crank(ctx: Context<Crank>) -> Result<()> {
@@ -174,6 +174,7 @@ pub mod mycelium {
                 total
             )?;
         }
+        Ok(())
     }
     pub fn mint_nft(ctx: Context<MintNFT>) -> Result<()> {
         transfer(
@@ -187,7 +188,7 @@ pub mod mycelium {
             ),
             ctx.accounts.mint_data.mint_price
         )?;
-        ctx.accounts.mint_data.amount++;
+        ctx.accounts.mint_data.amount += 1;
         ctx.accounts.mint_data.mint_price = (SUPPLY / (SUPPLY - ctx.accounts.mint_data.amount)) * PRICE;
         mint_to(
             CpiContext::new_with_signer(
@@ -340,15 +341,17 @@ pub struct InitializeUser<'info> {
         init,
         seeds = [b"account", user.key().as_ref()],
         bump,
-        token::mint = bank.mint,
+        payer = user,
+        token::mint = mint,
         token::authority = program_authority,
     )]
     pub user_storage_account: Account<'info, TokenAccount>,
     #[account(
         seeds = [b"bank"],
         bump
-    )],
+    )]
     pub bank: Account<'info, TokenAccount>,
+    pub mint: Account<'info, Mint>,
     #[account(
         seeds = [b"auth"],
         bump
@@ -356,6 +359,7 @@ pub struct InitializeUser<'info> {
     /// CHECK: 
     pub program_authority: AccountInfo<'info>,
     pub system_program: Program<'info, System>,
+    pub token_program: Program<'info, Token>,
 }
 #[derive(Accounts)]
 pub struct Fund<'info> {
@@ -586,4 +590,5 @@ pub struct Crank<'info> {
         bump
     )]
     pub stake_info: Account<'info, StakeInfo>,
+    pub token_program: Program<'info, Token>,
 }
