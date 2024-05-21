@@ -450,6 +450,12 @@ pub struct Unstake<'info> {
     pub user: Signer<'info>,
     #[account(
         mut,
+        seeds = [b"stake_data"],
+        bump
+    )]
+    pub stake_data: Account<'info, StakeData>,
+    #[account(
+        mut,
         seeds = [b"stake", user.key().as_ref()],
         bump,
     )]
