@@ -117,20 +117,6 @@ pub mod mycelium {
             None => return Err(CustomError::NotStaked.into()),
             Some(index) => index 
         };
-        let time_diff = Clock::get()?.unix_timestamp - ctx.accounts.stake_info.staked_times[index];
-        let amount = time_diff as u64;
-        transfer(
-            CpiContext::new_with_signer(
-                ctx.accounts.token_program.to_account_info(),
-                Transfer {
-                    from: ctx.accounts.bank.to_account_info(),
-                    to: ctx.accounts.user_token_account.to_account_info(),
-                    authority: ctx.accounts.bank.to_account_info(),
-                },
-                &[&[b"bank", &[ctx.bumps.bank]]]
-            ),
-            amount,
-        )?;
         ctx.accounts.stake_info.remove_stake(index);
         let new_size = StakeInfo::space(ctx.accounts.stake_info.mints.len());
         ctx.accounts.stake_info.to_account_info().realloc(new_size, false)?;
@@ -482,14 +468,6 @@ pub struct Unstake<'info> {
     )]
     /// CHECK: 
     pub program_authority: AccountInfo<'info>,
-    #[account(
-        mut,
-        seeds = [b"bank"],
-        bump
-    )]
-    pub bank: Account<'info, TokenAccount>,
-    #[account(mut)]
-    pub user_token_account: Account<'info, TokenAccount>,
     pub token_program: Program<'info, Token>,
 }
 #[derive(Accounts)]
