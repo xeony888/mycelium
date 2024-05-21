@@ -134,6 +134,8 @@ pub mod mycelium {
         ctx.accounts.stake_info.remove_stake(index);
         let new_size = StakeInfo::space(ctx.accounts.stake_info.mints.len());
         ctx.accounts.stake_info.to_account_info().realloc(new_size, false)?;
+        ctx.accounts.stake_data.amount -= 1;
+        ctx.accounts.stake_data.stake_reward = (1 - SUPPLY / ctx.accounts.stake_data.amount) * REWARD;
         Ok(())
     }
     pub fn claim(ctx: Context<Claim>, amount: u64) -> Result<()> {
@@ -271,7 +273,9 @@ pub enum CustomError {
     #[msg("Invalid Account")]
     InvalidAccount,
     #[msg("Not Staked")]
-    NotStaked
+    NotStaked,
+    #[msg("Out of Range")]
+    OutOfRange
 }
 #[account]
 pub struct StakeData {
