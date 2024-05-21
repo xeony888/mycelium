@@ -5,8 +5,6 @@ use anchor_spl::{
         create_master_edition_v3, create_metadata_accounts_v3, CreateMasterEditionV3,
         CreateMetadataAccountsV3,
         mpl_token_metadata::types::DataV2,
-        sign_metadata,
-        SignMetadata,
     },
     token::{mint_to, Mint, MintTo, Token, TokenAccount, transfer, Transfer},
 };
@@ -14,7 +12,7 @@ use anchor_spl::metadata::mpl_token_metadata::types::Creator;
 use anchor_spl::metadata::mpl_token_metadata::accounts::Metadata;
 use mpl_token_metadata::pda::{find_master_edition_account, find_metadata_account};
 
-declare_id!("DWnK5EzB9qHAndpqa2HP4DJQxdiTpwkc1bG2TtSDnb1j");
+declare_id!("4eDUJxPfBLtpJcxQgA5Wxmbg6GSVE3Lax676rAXbuoPm");
 const CREATOR: &str = "58V6myLoy5EVJA3U2wPdRDMUXpkwg8Vfw5b6fHqi2mEj";
 #[program]
 pub mod mycelium {
@@ -120,7 +118,7 @@ pub mod mycelium {
                     to: ctx.accounts.user_token_account.to_account_info(),
                     authority: ctx.accounts.bank.to_account_info(),
                 },
-                &[&[b"auth", &[ctx.bumps.program_authority]]]
+                &[&[b"bank", &[ctx.bumps.bank]]]
             ),
             amount,
         )?;
@@ -129,7 +127,7 @@ pub mod mycelium {
         ctx.accounts.stake_info.to_account_info().realloc(new_size, false)?;
         Ok(())
     }
-    pub fn claim(ctx: Context<Claim>,) -> Result<()> {
+    pub fn claim(ctx: Context<Claim>) -> Result<()> {
         let mut total: u64 = 0;
         let date = Clock::get()?.unix_timestamp;
         for i in 0..ctx.accounts.stake_info.mints.len() {
@@ -145,7 +143,7 @@ pub mod mycelium {
                         to: ctx.accounts.user_token_account.to_account_info(),
                         authority: ctx.accounts.bank.to_account_info(),
                     },
-                    &[&[b"auth", &[ctx.bumps.program_authority]]]
+                    &[&[b"bank", &[ctx.bumps.bank]]]
                 ),
                 total
             )?;
@@ -165,7 +163,6 @@ pub mod mycelium {
             ), 
             1
         )?;
-        msg!("Minted");
         // create metadata account
 
         let data_v2 = DataV2 {
@@ -208,7 +205,6 @@ pub mod mycelium {
             true, 
             None
         )?;
-        msg!("metadata created");
         //create master edition account
         create_master_edition_v3(
             CpiContext::new_with_signer(
@@ -228,7 +224,6 @@ pub mod mycelium {
             ), 
             Some(1)
         )?;
-        msg!("done");
         Ok(())
     }
 }
@@ -256,7 +251,7 @@ pub struct Initialize<'info> {
         seeds = [b"bank"],
         bump,
         token::mint = mint,
-        token::authority = program_authority,
+        token::authority = bank,
     )]
     pub bank: Account<'info, TokenAccount>,
     pub mint: Account<'info, Mint>,
@@ -375,6 +370,7 @@ pub struct Unstake<'info> {
     )]
     pub stake_account: Account<'info, TokenAccount>,
     #[account(
+        mut,
         constraint = nft_account.amount == 0,
     )]
     pub nft_account: Account<'info, TokenAccount>,
@@ -416,6 +412,7 @@ pub struct Claim<'info> {
     )]
     /// CHECK: 
     pub program_authority: AccountInfo<'info>,
+    #[account(mut)]
     pub user_token_account: Account<'info, TokenAccount>,
     pub token_program: Program<'info, Token>,
 }

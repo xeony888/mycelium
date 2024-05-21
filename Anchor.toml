@@ -5,13 +5,13 @@ seeds = false
 skip-lint = false
 
 [programs.localnet]
-mycelium = "DWnK5EzB9qHAndpqa2HP4DJQxdiTpwkc1bG2TtSDnb1j"
+mycelium = "4eDUJxPfBLtpJcxQgA5Wxmbg6GSVE3Lax676rAXbuoPm"
 
 [registry]
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "devnet"
+cluster = "Devnet"
 wallet = "/home/xeony/.config/solana/id.json"
 
 [scripts]

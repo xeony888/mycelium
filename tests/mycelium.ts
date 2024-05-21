@@ -37,7 +37,7 @@ describe("mycelium", () => {
       [Buffer.from("bank")],
       program.programId,
     )
-    let mint: PublicKey = new PublicKey("9BoLHoDmuqENZpxJfh1yggpNvR5N4Vu9MivENVLvNXRy");
+    let mint: PublicKey = new PublicKey("BFG1W788HxXDpbfDHRVcpDKDtmgcAPKxihsi2EzMideQ");
     const mintNft = async () => {
       const mint = anchor.web3.Keypair.generate();
 
@@ -132,6 +132,30 @@ describe("mycelium", () => {
       const account = await program.account.stakeInfo.fetch(stakeInfo);
       assert(account, "Account not fetched");
     });
+    it("stakes single", async () => {
+      const {mint: nftMint, associatedTokenAccount: nftAccount, metadataAccount} = await mintNft();
+      console.log("minted");
+      const [stakeInfo] = PublicKey.findProgramAddressSync(
+        [Buffer.from("stake"), wallet.publicKey.toBuffer()],
+        program.programId
+      );
+      const [stakeAccount] = PublicKey.findProgramAddressSync(
+        [Buffer.from("stake_account"), wallet.publicKey.toBuffer(), nftAccount.toBuffer()],
+        program.programId
+      );
+      await program.methods.stake().accounts({
+        user: wallet.publicKey,
+        stakeInfo,
+        stakeAccount,
+        nftAccount,
+        nftMetadataAccount: metadataAccount,
+        nftMint: nftMint.publicKey,
+        programAuthority,
+        tokenMetadataProgram: MPL_TOKEN_METADATA_PROGRAM_ID,
+      }).signers([wallet.payer]).rpc();
+      const stakeAccountInfo = await getAccount(provider.connection, stakeAccount);
+      assert(stakeAccountInfo.amount === BigInt(1), "User did not send nft");
+    })
     it("stakes and unstakes nft", async () => {
       const {mint: nftMint, associatedTokenAccount: nftAccount, metadataAccount} = await mintNft();
       console.log("mints");
@@ -209,7 +233,51 @@ describe("mycelium", () => {
       }).rpc();
       const after = await getAccount(provider.connection, userTokenAccount);
       assert(after.amount > before.amount, "User did not get tokens");
-    })  
+    });
+    it("stakes and claims multiple", async () => {
+      const [stakeInfo] = PublicKey.findProgramAddressSync(
+        [Buffer.from("stake"), wallet.publicKey.toBuffer()],
+        program.programId,
+      );
+
+      const mints: anchor.web3.Keypair[] = [], tokenAccounts: anchor.web3.PublicKey[] = [], metadataAccounts = [];
+      for (let i = 0; i < 5; i++) {
+        const {mint: nftMint, associatedTokenAccount: nftAccount, metadataAccount} = await mintNft();
+        mints.push(nftMint);
+        tokenAccounts.push(nftAccount);
+        metadataAccounts.push(metadataAccount);
+      }
+      const accountBefore = await program.account.stakeInfo.fetch(stakeInfo);
+      const transaction = new anchor.web3.Transaction();
+      for (let i = 0; i < mints.length; i++) {
+        const [stakeAccount] = PublicKey.findProgramAddressSync(
+          [Buffer.from("stake_account"), wallet.publicKey.toBuffer(), tokenAccounts[i].toBuffer()],
+          program.programId
+        )
+        const t = await program.methods.stake().accounts({
+          user: wallet.publicKey,
+          stakeInfo,
+          stakeAccount,
+          nftAccount: tokenAccounts[i],
+          nftMetadataAccount: metadataAccounts[i],
+          nftMint: mints[i].publicKey,
+          programAuthority,
+          tokenMetadataProgram: MPL_TOKEN_METADATA_PROGRAM_ID,
+        }).signers([wallet.payer]).transaction();
+        transaction.add(t);
+      }
+      await provider.sendAndConfirm(transaction);
+      const accountAfter = await program.account.stakeInfo.fetch(stakeInfo);
+      assert(accountAfter.mints.length > accountBefore.mints.length, "Did not add");
+      const userTokenAccount = getAssociatedTokenAddressSync(mint, wallet.publicKey);
+      await program.methods.claim().accounts({
+        user: wallet.publicKey,
+        stakeInfo,
+        userTokenAccount,
+        bank,
+        programAuthority,
+      }).rpc();
+    })
     it("mints nft!", async () => {
       const mint = anchor.web3.Keypair.generate();
 
