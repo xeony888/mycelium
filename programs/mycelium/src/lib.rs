@@ -12,14 +12,13 @@ use anchor_spl::metadata::mpl_token_metadata::types::Creator;
 use anchor_spl::metadata::mpl_token_metadata::accounts::Metadata;
 use mpl_token_metadata::pda::{find_master_edition_account, find_metadata_account};
 
-declare_id!("9bJTwjo4QTArngktZwUo68syhbQ4UnnFsuuyWgZEDh6R");
+declare_id!("5TH8JUgMfbngDCAvhyxAeCFwwstZXg4x3Zi9nAYH64TY");
 const CREATOR: &str = "58V6myLoy5EVJA3U2wPdRDMUXpkwg8Vfw5b6fHqi2mEj";
 const SUPPLY: u64 = 6000;
 const REWARD: u64 = 1000;
 const PRICE: u64 = 100000;
 #[program]
 pub mod mycelium {
-    use std::borrow::Borrow;
 
     use super::*;
     pub fn initialize2(ctx: Context<Initialize2>) -> Result<()> {
@@ -50,12 +49,9 @@ pub mod mycelium {
         Ok(())
     }
     pub fn stake(ctx: Context<Stake>) -> Result<()> {
-        let stake_data_account = &ctx.remaining_accounts[0];
-
-        // Deserialize the data
-        let data: &[u8] = &stake_data_account.try_borrow_data()?;
-        let mut stake_data: StakeData = StakeData::try_from_slice(data)?;
-        
+        // let stake_data_account = &ctx.accounts.stake_data;
+        // let data: &[u8] = &stake_data_account.try_borrow_data()?;
+        // let mut stake_data: StakeData = StakeData::try_from_slice(data)?;
         let metadata_full_account =  match Metadata::try_from(&ctx.accounts.nft_metadata_account).ok() {
             None => return Err(CustomError::InvalidAccount.into()),
             Some(account) => account
@@ -108,8 +104,8 @@ pub mod mycelium {
         stake_info.realloc(new_size, false)?;
         ctx.accounts.stake_info.add_stake(ctx.accounts.nft_account.mint.key(), time);
 
-        stake_data.stake_num += 1;
-        stake_data.stake_reward = (1 - SUPPLY / stake_data.stake_num) * REWARD;
+        // stake_data.stake_num += 1;
+        // stake_data.stake_reward = (1 - SUPPLY / stake_data.stake_num) * REWARD;
         Ok(())
     }
     pub fn unstake(ctx: Context<Unstake>) -> Result<()> {
@@ -132,34 +128,36 @@ pub mod mycelium {
         ctx.accounts.stake_info.remove_stake(index);
         let new_size = StakeInfo::space(ctx.accounts.stake_info.mints.len());
         ctx.accounts.stake_info.to_account_info().realloc(new_size, false)?;
-        ctx.accounts.stake_data.stake_num -= 1;
-        ctx.accounts.stake_data.stake_reward = (1 - SUPPLY / ctx.accounts.stake_data.stake_num) * REWARD;
+        // ctx.accounts.stake_data.stake_num -= 1;
+        // ctx.accounts.stake_data.stake_reward = (1 - SUPPLY / ctx.accounts.stake_data.stake_num) * REWARD;
         Ok(())
     }
     pub fn claim(ctx: Context<Claim>, amount: u64) -> Result<()> {
-        transfer(
-            CpiContext::new_with_signer(
-                ctx.accounts.token_program.to_account_info(),
-                Transfer {
-                    from: ctx.accounts.user_storage_account.to_account_info(),
-                    to: ctx.accounts.user_token_account.to_account_info(),
-                    authority: ctx.accounts.program_authority.to_account_info(),
-                },
-                &[&[b"auth", &[ctx.bumps.program_authority]]]
-            ),
-            amount
-        )?;
+        if amount > 0 {
+            transfer(
+                CpiContext::new_with_signer(
+                    ctx.accounts.token_program.to_account_info(),
+                    Transfer {
+                        from: ctx.accounts.user_storage_account.to_account_info(),
+                        to: ctx.accounts.user_token_account.to_account_info(),
+                        authority: ctx.accounts.program_authority.to_account_info(),
+                    },
+                    &[&[b"auth", &[ctx.bumps.program_authority]]]
+                ),
+                amount
+            )?;
+        }
         Ok(())
     }
     pub fn crank(ctx: Context<Crank>) -> Result<()> {
         let mut total: u64 = 0;
         let date = Clock::get()?.unix_timestamp;
-        let reward = ctx.accounts.stake_data.stake_reward;
+        let reward: u64 = 1; //ctx.accounts.stake_data.stake_reward;
         for i in 0..ctx.accounts.stake_info.mints.len() {
             total += reward * ((date - ctx.accounts.stake_info.staked_times[i]) as u64);
             ctx.accounts.stake_info.staked_times[i] = date;
         }
-        total /= 86400;
+        total = total * 10_u64.pow(9) / 86400;
         if total > 0 {
             transfer(
                 CpiContext::new_with_signer(
@@ -410,6 +408,7 @@ pub struct Stake<'info> {
     //     seeds = [b"stake_data"],
     //     bump,
     // )]
+    // pub stake_data: AccountInfo<'info>,
     #[account(
         mut,
         seeds = [b"stake", user.key().as_ref()],
@@ -455,12 +454,12 @@ pub struct Stake<'info> {
 pub struct Unstake<'info> {
     #[account(mut)]
     pub user: Signer<'info>,
-    #[account(
-        mut,
-        seeds = [b"stake_data"],
-        bump
-    )]
-    pub stake_data: Account<'info, StakeData>,
+    // #[account(
+    //     mut,
+    //     seeds = [b"stake_data"],
+    //     bump
+    // )]
+    // pub stake_data: Account<'info, StakeData>,
     #[account(
         mut,
         seeds = [b"stake", user.key().as_ref()],
@@ -584,11 +583,11 @@ pub struct Crank<'info> {
         bump,
     )]
     pub bank: Account<'info, TokenAccount>,
-    #[account(
-        seeds = [b"stake_data"],
-        bump,
-    )]
-    pub stake_data: Account<'info, StakeData>,
+    // #[account(
+    //     seeds = [b"stake_data"],
+    //     bump,
+    // )]
+    // pub stake_data: Account<'info, StakeData>,
     #[account(
         mut,
         seeds = [b"stake", user.key().as_ref()],
