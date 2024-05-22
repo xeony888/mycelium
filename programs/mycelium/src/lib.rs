@@ -96,8 +96,8 @@ pub mod mycelium {
         stake_info.realloc(new_size, false)?;
         ctx.accounts.stake_info.add_stake(ctx.accounts.nft_account.mint.key(), time);
 
-        ctx.accounts.stake_data.amount += 1;
-        ctx.accounts.stake_data.stake_reward = (1 - SUPPLY / ctx.accounts.stake_data.amount) * REWARD;
+        ctx.accounts.stake_data.stake_num += 1;
+        ctx.accounts.stake_data.stake_reward = (1 - SUPPLY / ctx.accounts.stake_data.stake_num) * REWARD;
         Ok(())
     }
     pub fn unstake(ctx: Context<Unstake>) -> Result<()> {
@@ -120,8 +120,8 @@ pub mod mycelium {
         ctx.accounts.stake_info.remove_stake(index);
         let new_size = StakeInfo::space(ctx.accounts.stake_info.mints.len());
         ctx.accounts.stake_info.to_account_info().realloc(new_size, false)?;
-        ctx.accounts.stake_data.amount -= 1;
-        ctx.accounts.stake_data.stake_reward = (1 - SUPPLY / ctx.accounts.stake_data.amount) * REWARD;
+        ctx.accounts.stake_data.stake_num -= 1;
+        ctx.accounts.stake_data.stake_reward = (1 - SUPPLY / ctx.accounts.stake_data.stake_num) * REWARD;
         Ok(())
     }
     pub fn claim(ctx: Context<Claim>, amount: u64) -> Result<()> {
@@ -176,8 +176,8 @@ pub mod mycelium {
             ),
             ctx.accounts.mint_data.mint_price
         )?;
-        ctx.accounts.mint_data.amount += 1;
-        ctx.accounts.mint_data.mint_price = (SUPPLY / (SUPPLY - ctx.accounts.mint_data.amount)) * PRICE;
+        ctx.accounts.mint_data.mint_num += 1;
+        ctx.accounts.mint_data.mint_price = (SUPPLY / (SUPPLY - ctx.accounts.mint_data.mint_num)) * PRICE;
         mint_to(
             CpiContext::new_with_signer(
                 ctx.accounts.token_program.to_account_info(),
