@@ -50,12 +50,12 @@ pub mod mycelium {
         Ok(())
     }
     pub fn stake(ctx: Context<Stake>) -> Result<()> {
-        let stake_data_account = &ctx.accounts.stake_data;
+        let stake_data_account = &ctx.remaining_accounts[0];
 
         // Deserialize the data
         let data: &[u8] = &stake_data_account.try_borrow_data()?;
-        let mut stake_data: StakeData = StakeData::try_from_slice(data)
-            .map_err(|_| ProgramError::InvalidAccountData)?;
+        let mut stake_data: StakeData = StakeData::try_from_slice(data)?;
+        
         let metadata_full_account =  match Metadata::try_from(&ctx.accounts.nft_metadata_account).ok() {
             None => return Err(CustomError::InvalidAccount.into()),
             Some(account) => account
