@@ -50,11 +50,8 @@ pub mod mycelium {
         Ok(())
     }
     pub fn stake(ctx: Context<Stake>) -> Result<()> {
-        let mut stake_data = match StakeData::try_from_slice(&ctx.accounts.stake_data.data.borrow_mut()).ok() {
-            None => return Err(CustomError::InvalidAccount.into()),
-            Some(account) => account,
-        };
-        
+        let data = &ctx.accounts.stake_data.try_borrow_mut_data()?[..];
+        let mut stake_data = StakeData::try_from_slice(data)?;
         let metadata_full_account =  match Metadata::try_from(&ctx.accounts.nft_metadata_account).ok() {
             None => return Err(CustomError::InvalidAccount.into()),
             Some(account) => account
@@ -63,6 +60,7 @@ pub mod mycelium {
             None => return Err(CustomError::InvalidAccount.into()),
             Some(account) => account,
         };
+        
         let mut valid = false;
         for creator in creators {
             if creator.verified && creator.address == ctx.accounts.program_authority.key() {
