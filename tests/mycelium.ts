@@ -122,7 +122,7 @@ describe("mycelium", () => {
     };
     // derive the metadata account
     it("initializes", async () => {
-      //await setupToken();
+      await setupToken();
       await program.methods.initialize().accounts({
         programAuthority,
         bank,
@@ -141,7 +141,7 @@ describe("mycelium", () => {
       }).rpc();
       const accountInfo = await getAccount(provider.connection, bank);
       assert(accountInfo.amount > BigInt(0), "Bank not funded");
-    })
+    });
     it("initializes user account", async () => {
       const [stakeInfo] = PublicKey.findProgramAddressSync(
         [Buffer.from("stake"), wallet.publicKey.toBuffer()],
@@ -222,13 +222,11 @@ describe("mycelium", () => {
       );
       await program.methods.unstake().accounts({
         user: wallet.publicKey,
-        userTokenAccount: userTokenAccountBefore.address,
         stakeInfo,
         stakeData,
         stakeAccount,
         nftAccount,
         programAuthority,
-        bank
       }).rpc();
       const userTokenAccountAfter = await getAccount(provider.connection, userTokenAccountBefore.address);
       assert(userTokenAccountAfter.amount > userTokenAccountBefore.amount, "User did not get token");
@@ -260,9 +258,15 @@ describe("mycelium", () => {
       }).signers([wallet.payer]).rpc();
 
       const before = await getAccount(provider.connection, userTokenAccount);
-      await program.methods.claim().accounts({
+      const [storageAccount] = PublicKey.findProgramAddressSync(
+        [Buffer.from("account"), wallet.publicKey.toBuffer()],
+        program.programId,
+      );
+      const accountData = await getAccount(provider.connection, storageAccount);
+      await program.methods.claim(new anchor.BN(Number(accountData.amount.toString()))).accounts({
         user: wallet.publicKey,
         programAuthority,
+        userStorageAccount: storageAccount,
         userTokenAccount
       }).rpc();
       const after = await getAccount(provider.connection, userTokenAccount);
@@ -273,7 +277,6 @@ describe("mycelium", () => {
         [Buffer.from("stake"), wallet.publicKey.toBuffer()],
         program.programId,
       );
-
       const mints: anchor.web3.Keypair[] = [], tokenAccounts: anchor.web3.PublicKey[] = [], metadataAccounts = [];
       for (let i = 0; i < 5; i++) {
         const {mint: nftMint, associatedTokenAccount: nftAccount, metadataAccount} = await mintNft();
@@ -287,7 +290,7 @@ describe("mycelium", () => {
         const [stakeAccount] = PublicKey.findProgramAddressSync(
           [Buffer.from("stake_account"), wallet.publicKey.toBuffer(), tokenAccounts[i].toBuffer()],
           program.programId
-        )
+        );
         const t = await program.methods.stake().accounts({
           user: wallet.publicKey,
           stakeInfo,
@@ -304,11 +307,15 @@ describe("mycelium", () => {
       const accountAfter = await program.account.stakeInfo.fetch(stakeInfo);
       assert(accountAfter.mints.length > accountBefore.mints.length, "Did not add");
       const userTokenAccount = getAssociatedTokenAddressSync(mint, wallet.publicKey);
-      await program.methods.claim().accounts({
+      const [storageAccount] = PublicKey.findProgramAddressSync(
+        [Buffer.from("account"), wallet.publicKey.toBuffer()],
+        program.programId,
+      );
+      const account = await getAccount(provider.connection, storageAccount);
+      await program.methods.claim(new anchor.BN(Number(account.amount.toString()))).accounts({
         user: wallet.publicKey,
-        stakeInfo,
         userTokenAccount,
-        bank,
+        userStorageAccount: storageAccount,
         programAuthority,
       }).rpc();
     })

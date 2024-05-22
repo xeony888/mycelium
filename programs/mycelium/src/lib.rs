@@ -12,7 +12,7 @@ use anchor_spl::metadata::mpl_token_metadata::types::Creator;
 use anchor_spl::metadata::mpl_token_metadata::accounts::Metadata;
 use mpl_token_metadata::pda::{find_master_edition_account, find_metadata_account};
 
-declare_id!("9VpuWDGg76xF5QsEiVmsRyewg5fYCprXbDLwfNES91AK");
+declare_id!("GZrS31tXu494k1uUQ4fQayozndtwenDFUQLa5kogbXUW");
 const CREATOR: &str = "58V6myLoy5EVJA3U2wPdRDMUXpkwg8Vfw5b6fHqi2mEj";
 const SUPPLY: u64 = 6000;
 const REWARD: u64 = 1000;
@@ -21,10 +21,10 @@ const PRICE: u64 = 100000;
 pub mod mycelium {
     use super::*;
     pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
-        ctx.accounts.mint_data.amount = 0;
-        ctx.accounts.mint_data.mint_price = 0;
-        ctx.accounts.stake_data.amount = 0;
-        ctx.accounts.stake_data.stake_reward = REWARD;
+        // ctx.accounts.mint_data.amount = 0;
+        // ctx.accounts.mint_data.mint_price = 1;
+        // ctx.accounts.stake_data.amount = 0;
+        // ctx.accounts.stake_data.stake_reward = REWARD;
         Ok(())
     }
     pub fn initialize_user(_ctx: Context<InitializeUser>) -> Result<()> {
@@ -265,12 +265,12 @@ pub enum CustomError {
 }
 #[account]
 pub struct StakeData {
-    amount: u64,
+    stake_num: u64,
     stake_reward: u64,
 }
 #[account]
 pub struct MintData {
-    amount: u64,
+    mint_num: u64,
     mint_price: u64,
 }
 #[derive(Accounts)]
