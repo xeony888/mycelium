@@ -19,6 +19,8 @@ const REWARD: u64 = 1000;
 const PRICE: u64 = 100000;
 #[program]
 pub mod mycelium {
+    use std::borrow::Borrow;
+
     use super::*;
     pub fn initialize2(ctx: Context<Initialize2>) -> Result<()> {
         ctx.accounts.mint_data.mint_num = 0;
@@ -48,6 +50,11 @@ pub mod mycelium {
         Ok(())
     }
     pub fn stake(ctx: Context<Stake>) -> Result<()> {
+        let mut stake_data = match StakeData::try_from_slice(&ctx.accounts.stake_data.data.borrow_mut()).ok() {
+            None => return Err(CustomError::InvalidAccount.into()),
+            Some(account) => account,
+        };
+        
         let metadata_full_account =  match Metadata::try_from(&ctx.accounts.nft_metadata_account).ok() {
             None => return Err(CustomError::InvalidAccount.into()),
             Some(account) => account
@@ -99,8 +106,8 @@ pub mod mycelium {
         stake_info.realloc(new_size, false)?;
         ctx.accounts.stake_info.add_stake(ctx.accounts.nft_account.mint.key(), time);
 
-        // ctx.accounts.stake_data.stake_num += 1;
-        // ctx.accounts.stake_data.stake_reward = (1 - SUPPLY / ctx.accounts.stake_data.stake_num) * REWARD;
+        stake_data.stake_num += 1;
+        stake_data.stake_reward = (1 - SUPPLY / stake_data.stake_num) * REWARD;
         Ok(())
     }
     pub fn unstake(ctx: Context<Unstake>) -> Result<()> {
