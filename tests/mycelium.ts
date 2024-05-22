@@ -10,7 +10,7 @@ import {
     MPL_TOKEN_METADATA_PROGRAM_ID,
 } from "@metaplex-foundation/mpl-token-metadata";
 import { createUmi } from "@metaplex-foundation/umi-bundle-defaults";
-import { publicKey } from "@metaplex-foundation/umi";
+import { lamports, publicKey } from "@metaplex-foundation/umi";
 import { PublicKey } from '@solana/web3.js';
 import {
   TOKEN_PROGRAM_ID,
@@ -45,8 +45,9 @@ describe("mycelium", () => {
       [Buffer.from("mint_data")],
       program.programId,
     );
-    let mint: PublicKey = new PublicKey("BFG1W788HxXDpbfDHRVcpDKDtmgcAPKxihsi2EzMideQ");
+    let mint: PublicKey = new PublicKey("F5KLXmwneQNCJPpf23K6pvmRa2ZKFaZvuhmDWDp5Mf3W");
     const mintNft = async () => {
+      const globalMint = new PublicKey("F5KLXmwneQNCJPpf23K6pvmRa2ZKFaZvuhmDWDp5Mf3W");
       const mint = anchor.web3.Keypair.generate();
 
       // Derive the associated token address account for the mint
@@ -61,6 +62,7 @@ describe("mycelium", () => {
     let masterEditionAccount = findMasterEditionPda(umi, {
         mint: publicKey(mint.publicKey),
     })[0];
+    const userTokenAccount = getAssociatedTokenAddressSync(globalMint, wallet.publicKey);
         const tx2 = await program.methods
           .mintNft()
           .accounts({
@@ -69,6 +71,9 @@ describe("mycelium", () => {
                 associatedTokenAccount,
                 programAuthority,
                 metadataAccount,
+                mintData,
+                bank,
+                userTokenAccount,
                 masterEditionAccount,
                 tokenProgram: TOKEN_PROGRAM_ID,
                 associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
@@ -123,14 +128,23 @@ describe("mycelium", () => {
     // derive the metadata account
     it("initializes", async () => {
       await setupToken();
+      const balance = await provider.connection.getBalance(wallet.publicKey);
+      console.log(balance / anchor.web3.LAMPORTS_PER_SOL);
       await program.methods.initialize().accounts({
         programAuthority,
         bank,
         mint,
+        user: wallet.publicKey,
+      }).rpc();
+      await program.methods.initialize2().accounts({
         stakeData,
         mintData,
         user: wallet.publicKey,
       }).rpc();
+      const stakeAccount = await program.account.stakeData.fetch(stakeData);
+      console.log(stakeAccount);
+      const mintAccount = await program.account.mintData.fetch(mintData);
+      console.log(mintAccount);
     })
     it("funds", async () => {
       const userTokenAccount = getAssociatedTokenAddressSync(mint, wallet.publicKey);
@@ -320,6 +334,7 @@ describe("mycelium", () => {
       }).rpc();
     })
     it("mints nft!", async () => {
+      const globalMint = new PublicKey("F5KLXmwneQNCJPpf23K6pvmRa2ZKFaZvuhmDWDp5Mf3W");
       const mint = anchor.web3.Keypair.generate();
 
       // Derive the associated token address account for the mint
@@ -337,6 +352,7 @@ describe("mycelium", () => {
       let masterEditionAccount = findMasterEditionPda(umi, {
           mint: publicKey(mint.publicKey),
       })[0];
+      const userTokenAccount = getAssociatedTokenAddressSync(globalMint, wallet.publicKey);
           const tx = await program.methods
               .mintNft()
               .accounts({
@@ -345,6 +361,9 @@ describe("mycelium", () => {
                   associatedTokenAccount,
                   metadataAccount,
                   programAuthority,
+                  mintData,
+                  bank,
+                  userTokenAccount,
                   masterEditionAccount,
                   tokenProgram: TOKEN_PROGRAM_ID,
                   associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,

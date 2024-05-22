@@ -12,7 +12,7 @@ use anchor_spl::metadata::mpl_token_metadata::types::Creator;
 use anchor_spl::metadata::mpl_token_metadata::accounts::Metadata;
 use mpl_token_metadata::pda::{find_master_edition_account, find_metadata_account};
 
-declare_id!("GZrS31tXu494k1uUQ4fQayozndtwenDFUQLa5kogbXUW");
+declare_id!("EkTEWy7UYXthM479is4raJKkNfUKe6nqgirf4v6b8vM2");
 const CREATOR: &str = "58V6myLoy5EVJA3U2wPdRDMUXpkwg8Vfw5b6fHqi2mEj";
 const SUPPLY: u64 = 6000;
 const REWARD: u64 = 1000;
@@ -20,11 +20,14 @@ const PRICE: u64 = 100000;
 #[program]
 pub mod mycelium {
     use super::*;
+    pub fn initialize2(ctx: Context<Initialize2>) -> Result<()> {
+        ctx.accounts.mint_data.mint_num = 0;
+        ctx.accounts.mint_data.mint_price = 1;
+        ctx.accounts.stake_data.stake_num = 0;
+        ctx.accounts.stake_data.stake_reward = REWARD;
+        Ok(())
+    }
     pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
-        // ctx.accounts.mint_data.amount = 0;
-        // ctx.accounts.mint_data.mint_price = 1;
-        // ctx.accounts.stake_data.amount = 0;
-        // ctx.accounts.stake_data.stake_reward = REWARD;
         Ok(())
     }
     pub fn initialize_user(_ctx: Context<InitializeUser>) -> Result<()> {
@@ -96,8 +99,8 @@ pub mod mycelium {
         stake_info.realloc(new_size, false)?;
         ctx.accounts.stake_info.add_stake(ctx.accounts.nft_account.mint.key(), time);
 
-        ctx.accounts.stake_data.stake_num += 1;
-        ctx.accounts.stake_data.stake_reward = (1 - SUPPLY / ctx.accounts.stake_data.stake_num) * REWARD;
+        // ctx.accounts.stake_data.stake_num += 1;
+        // ctx.accounts.stake_data.stake_reward = (1 - SUPPLY / ctx.accounts.stake_data.stake_num) * REWARD;
         Ok(())
     }
     pub fn unstake(ctx: Context<Unstake>) -> Result<()> {
@@ -165,19 +168,19 @@ pub mod mycelium {
         Ok(())
     }
     pub fn mint_nft(ctx: Context<MintNFT>) -> Result<()> {
-        transfer(
-            CpiContext::new(
-                ctx.accounts.token_program.to_account_info(),
-                Transfer {
-                    from: ctx.accounts.user_token_account.to_account_info(),
-                    to: ctx.accounts.bank.to_account_info(),
-                    authority: ctx.accounts.signer.to_account_info(),
-                }
-            ),
-            ctx.accounts.mint_data.mint_price
-        )?;
-        ctx.accounts.mint_data.mint_num += 1;
-        ctx.accounts.mint_data.mint_price = (SUPPLY / (SUPPLY - ctx.accounts.mint_data.mint_num)) * PRICE;
+        // transfer(
+        //     CpiContext::new(
+        //         ctx.accounts.token_program.to_account_info(),
+        //         Transfer {
+        //             from: ctx.accounts.user_token_account.to_account_info(),
+        //             to: ctx.accounts.bank.to_account_info(),
+        //             authority: ctx.accounts.signer.to_account_info(),
+        //         }
+        //     ),
+        //     ctx.accounts.mint_data.mint_price
+        // )?;
+        // ctx.accounts.mint_data.mint_num += 1;
+        // ctx.accounts.mint_data.mint_price = (SUPPLY / (SUPPLY - ctx.accounts.mint_data.mint_num)) * PRICE;
         mint_to(
             CpiContext::new_with_signer(
                 ctx.accounts.token_program.to_account_info(),
@@ -274,6 +277,28 @@ pub struct MintData {
     mint_price: u64,
 }
 #[derive(Accounts)]
+pub struct Initialize2<'info> {
+    #[account(mut)]
+    pub user: Signer<'info>,
+    #[account(
+        init,
+        payer = user,
+        seeds = [b"stake_data"],
+        bump,
+        space = 8 + 8 + 8,
+    )]
+    pub stake_data: Account<'info, StakeData>, 
+    #[account(
+        init,
+        payer = user,
+        seeds = [b"mint_data"],
+        bump,
+        space = 8 + 8 + 8,
+    )]
+    pub mint_data: Account<'info, MintData>,
+    pub system_program: Program<'info, System>,
+}
+#[derive(Accounts)]
 pub struct Initialize<'info> {
     #[account(
         init,
@@ -294,22 +319,6 @@ pub struct Initialize<'info> {
     )]
     pub bank: Account<'info, TokenAccount>,
     pub mint: Account<'info, Mint>,
-    #[account(
-        init,
-        payer = user,
-        seeds = [b"stake_data"],
-        bump,
-        space = 8 + 8 + 8,
-    )]
-    pub stake_data: Account<'info, StakeData>, 
-    #[account(
-        init,
-        payer = user,
-        seeds = [b"mint_data"],
-        bump,
-        space = 8 + 8 + 8,
-    )]
-    pub mint_data: Account<'info, MintData>,
     #[account(mut)]
     pub user: Signer<'info>,
     pub system_program: Program<'info, System>,
@@ -387,12 +396,13 @@ impl StakeInfo {
 pub struct Stake<'info> {
     #[account(mut)]
     pub user: Signer<'info>,
-    #[account(
-        mut,
-        seeds = [b"stake_data"],
-        bump,
-    )]
-    pub stake_data: Account<'info, StakeData>,
+    // #[account(
+    //     mut,
+    //     seeds = [b"stake_data"],
+    //     bump,
+    // )]
+    /// CHECK: 
+    pub stake_data: AccountInfo<'info>,
     #[account(
         mut,
         seeds = [b"stake", user.key().as_ref()],
@@ -494,12 +504,12 @@ pub struct Claim<'info> {
 pub struct MintNFT<'info> {
     #[account(mut)]
     pub signer: Signer<'info>,
-    #[account(
-        mut, 
-        seeds = [b"mint_data"],
-        bump,
-    )]
-    pub mint_data: Account<'info, MintData>,
+    // #[account(
+    //     mut, 
+    //     seeds = [b"mint_data"],
+    //     bump,
+    // )]
+    // pub mint_data: Account<'info, MintData>,
     #[account(
         seeds = [b"auth"],
         bump,
@@ -533,14 +543,14 @@ pub struct MintNFT<'info> {
         address=find_master_edition_account(&mint.key()).0,
     )]
     pub master_edition_account: AccountInfo<'info>, 
-    #[account(
-        mut,
-        seeds = [b"bank"],
-        bump,
-    )]
-    pub bank: Account<'info, TokenAccount>,
-    #[account(mut)]
-    pub user_token_account: Account<'info, TokenAccount>,
+    // #[account(
+    //     mut,
+    //     seeds = [b"bank"],
+    //     bump,
+    // )]
+    // pub bank: Account<'info, TokenAccount>,
+    // #[account(mut)]
+    // pub user_token_account: Account<'info, TokenAccount>,
     pub token_program: Program<'info, Token>,
     pub associated_token_program: Program<'info, AssociatedToken>,
     /// CHECK: 
