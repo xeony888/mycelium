@@ -12,7 +12,7 @@ use anchor_spl::metadata::mpl_token_metadata::types::Creator;
 use anchor_spl::metadata::mpl_token_metadata::accounts::Metadata;
 use mpl_token_metadata::pda::{find_master_edition_account, find_metadata_account};
 
-declare_id!("EkTEWy7UYXthM479is4raJKkNfUKe6nqgirf4v6b8vM2");
+declare_id!("9bJTwjo4QTArngktZwUo68syhbQ4UnnFsuuyWgZEDh6R");
 const CREATOR: &str = "58V6myLoy5EVJA3U2wPdRDMUXpkwg8Vfw5b6fHqi2mEj";
 const SUPPLY: u64 = 6000;
 const REWARD: u64 = 1000;
@@ -50,8 +50,12 @@ pub mod mycelium {
         Ok(())
     }
     pub fn stake(ctx: Context<Stake>) -> Result<()> {
-        let data = &ctx.accounts.stake_data.try_borrow_mut_data()?[..];
-        let mut stake_data = StakeData::try_from_slice(data)?;
+        let stake_data_account = &ctx.accounts.stake_data;
+
+        // Deserialize the data
+        let data: &[u8] = &stake_data_account.try_borrow_data()?;
+        let mut stake_data: StakeData = StakeData::try_from_slice(data)
+            .map_err(|_| ProgramError::InvalidAccountData)?;
         let metadata_full_account =  match Metadata::try_from(&ctx.accounts.nft_metadata_account).ok() {
             None => return Err(CustomError::InvalidAccount.into()),
             Some(account) => account
@@ -406,8 +410,6 @@ pub struct Stake<'info> {
     //     seeds = [b"stake_data"],
     //     bump,
     // )]
-    /// CHECK: 
-    pub stake_data: AccountInfo<'info>,
     #[account(
         mut,
         seeds = [b"stake", user.key().as_ref()],
